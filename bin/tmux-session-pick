@@ -1,0 +1,209 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CURRENT_SOCKET=""
+CURRENT_SESSION=""
+
+tmux_option_or_fallback() {
+  local option_value
+  option_value="$(tmux show-option -gqv "$1" 2>/dev/null || true)"
+  if [[ -z "$option_value" ]]; then
+    option_value="$2"
+  fi
+  echo "$option_value"
+}
+
+socket_from_tmux_env() {
+  local tmux_env socket_path socket_name
+  tmux_env="${TMUX:-}"
+  if [[ -z "$tmux_env" ]]; then
+    return 1
+  fi
+  socket_path="${tmux_env%%,*}"
+  socket_name="${socket_path##*/}"
+  [[ -n "$socket_name" ]] || return 1
+  printf '%s\n' "$socket_name"
+}
+
+collect_sockets() {
+  local current
+  current="$(socket_from_tmux_env || true)"
+  printf '%s\n' "$current" default gt | awk 'NF' | awk '!seen[$0]++'
+}
+
+get_sorted_sessions_for_socket() {
+  local socket="$1" last_session sessions
+  last_session="$(tmux -L "$socket" display-message -p '#{client_last_session}' 2>/dev/null || true)"
+  sessions="$(tmux -L "$socket" list-sessions -F '#{session_name}' 2>/dev/null || true)"
+  if [[ -z "$sessions" ]]; then
+    return 0
+  fi
+  if [[ -n "$last_session" ]]; then
+    echo "$sessions" | grep -v "^$last_session$" || true
+    echo "$last_session"
+  else
+    echo "$sessions"
+  fi | awk 'NF' | awk '!seen[$0]++'
+}
+
+build_input_rows() {
+  local socket session attached
+  while IFS= read -r socket; do
+    while IFS= read -r session; do
+      [[ -n "$session" ]] || continue
+      attached="$(tmux -L "$socket" list-sessions -F '#{session_name}\t#{?session_attached,yes,no}' 2>/dev/null | awk -F'\t' -v s="$session" '$1==s{print $2; exit}')"
+      [[ -n "$attached" ]] || attached="no"
+      printf '%s\t%s\t%s\t[%s] %s\n' "$socket" "$session" "$attached" "$socket" "$session"
+    done < <(get_sorted_sessions_for_socket "$socket")
+  done < <(collect_sockets)
+}
+
+handle_output() {
+  local socket="$1" session="$2"
+  if [[ -z "$socket" || -z "$session" ]]; then
+    exit 0
+  fi
+
+  if ! tmux -L "$socket" has-session -t "$session" 2>/dev/null; then
+    tmux -L "$socket" new-session -ds "$session"
+  fi
+
+  if [[ -n "${TMUX:-}" ]]; then
+    if [[ "$socket" == "$CURRENT_SOCKET" ]]; then
+      tmux -L "$socket" switch-client -t "$session"
+      return
+    fi
+    tmux detach-client -E "tmux -L $socket attach-session -t $session"
+    return
+  fi
+
+  tmux -L "$socket" attach-session -t "$session"
+}
+
+main() {
+  local input query socket session preview_location preview_ratio prompt_icon pointer_icon
+  local bind_accept bind_exit bind_delete_char bind_scroll_up bind_scroll_down bind_select_up bind_select_down bind_kill_session
+  local additional_fzf_options header result fzf_cmd window_height window_width
+
+  command -v tmux >/dev/null 2>&1 || { echo "tmux required" >&2; exit 1; }
+  if command -v fzf-tmux >/dev/null 2>&1; then
+    fzf_cmd="fzf-tmux"
+  elif command -v fzf >/dev/null 2>&1; then
+    fzf_cmd="fzf"
+  else
+    echo "fzf or fzf-tmux required" >&2
+    exit 1
+  fi
+
+  CURRENT_SOCKET="$(socket_from_tmux_env || true)"
+  CURRENT_SESSION="$(tmux display-message -p '#S' 2>/dev/null || true)"
+
+  if [[ "${1:-}" == "--list" ]]; then
+    build_input_rows
+    exit 0
+  fi
+
+  input="$(build_input_rows)"
+  if [[ -z "${input//[[:space:]]/}" ]]; then
+    echo "No sessions found on default/gt sockets." >&2
+    exit 1
+  fi
+
+  preview_location="$(tmux_option_or_fallback '@tmux-session-pick-preview-location' 'right')"
+  preview_ratio="$(tmux_option_or_fallback '@tmux-session-pick-preview-ratio' '75%')"
+  window_height="$(tmux_option_or_fallback '@tmux-session-pick-window-height' '75%')"
+  window_width="$(tmux_option_or_fallback '@tmux-session-pick-window-width' '75%')"
+  prompt_icon="$(tmux_option_or_fallback '@tmux-session-pick-prompt' ' ')"
+  pointer_icon="$(tmux_option_or_fallback '@tmux-session-pick-pointer' '▶')"
+  bind_accept="$(tmux_option_or_fallback '@tmux-session-pick-bind-accept' 'enter')"
+  bind_exit="$(tmux_option_or_fallback '@tmux-session-pick-bind-abort' 'esc')"
+  bind_delete_char="$(tmux_option_or_fallback '@tmux-session-pick-bind-delete-char' 'bspace')"
+  bind_scroll_up="$(tmux_option_or_fallback '@tmux-session-pick-bind-scroll-up' 'ctrl-u')"
+  bind_scroll_down="$(tmux_option_or_fallback '@tmux-session-pick-bind-scroll-down' 'ctrl-d')"
+  bind_select_up="$(tmux_option_or_fallback '@tmux-session-pick-bind-select-up' 'ctrl-n')"
+  bind_select_down="$(tmux_option_or_fallback '@tmux-session-pick-bind-select-down' 'ctrl-p')"
+  bind_kill_session="$(tmux_option_or_fallback '@tmux-session-pick-bind-kill-session' 'alt-bspace')"
+  additional_fzf_options="$(tmux_option_or_fallback '@tmux-session-pick-additional-options' '--color pointer:9,spinner:92,marker:46')"
+  header="$bind_accept=select  $bind_kill_session=kill  $bind_select_up=up  $bind_select_down=down  $bind_scroll_up=prev-up  $bind_scroll_down=prev-down  ?=toggle-preview"
+
+  if [[ "$fzf_cmd" == "fzf-tmux" ]]; then
+    result="$(
+      echo "$input" |
+        fzf-tmux $additional_fzf_options -p "${window_width},${window_height}" \
+          --bind "$bind_accept:accept" \
+          --bind "$bind_exit:abort" \
+          --bind "$bind_delete_char:backward-delete-char" \
+          --bind "$bind_select_up:up" \
+          --bind "$bind_select_down:down" \
+          --bind "$bind_scroll_up:preview-half-page-up" \
+          --bind "$bind_scroll_down:preview-half-page-down" \
+          --bind "$bind_kill_session:execute-silent(tmux -L {1} kill-session -t {2})+reload($0 --list)" \
+          --bind '?:toggle-preview' \
+          --delimiter $'\t' \
+          --with-nth=4 \
+          --header "$header" \
+          --prompt "$prompt_icon" \
+          --pointer "$pointer_icon" \
+          --layout default \
+          --preview 'tmux -L {1} capture-pane -pt {2} 2>/dev/null | tail -n 120' \
+          --preview-window "${preview_location},${preview_ratio},," \
+          --print-query \
+          --exit-0 \
+          --tac |
+        tail -n1
+    )" || exit 0
+  else
+    result="$(
+      echo "$input" |
+        fzf $additional_fzf_options \
+          --bind "$bind_accept:accept" \
+          --bind "$bind_exit:abort" \
+          --bind "$bind_delete_char:backward-delete-char" \
+          --bind "$bind_select_up:up" \
+          --bind "$bind_select_down:down" \
+          --bind "$bind_scroll_up:preview-half-page-up" \
+          --bind "$bind_scroll_down:preview-half-page-down" \
+          --bind "$bind_kill_session:execute-silent(tmux -L {1} kill-session -t {2})+reload($0 --list)" \
+          --bind '?:toggle-preview' \
+          --delimiter $'\t' \
+          --with-nth=4 \
+          --header "$header" \
+          --prompt "$prompt_icon" \
+          --pointer "$pointer_icon" \
+          --layout default \
+          --preview 'tmux -L {1} capture-pane -pt {2} 2>/dev/null | tail -n 120' \
+          --preview-window "${preview_location},${preview_ratio},," \
+          --print-query \
+          --exit-0 \
+          --tac |
+        tail -n1
+    )" || exit 0
+  fi
+
+  if [[ -n "$result" && "$result" == *$'\t'* ]]; then
+    socket="$(printf '%s' "$result" | cut -f1)"
+    session="$(printf '%s' "$result" | cut -f2)"
+    handle_output "$socket" "$session"
+    exit 0
+  fi
+
+  query="$(printf '%s' "$result" | tr -d '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+  if [[ -z "$query" ]]; then
+    exit 0
+  fi
+
+  # Accept can yield the display text ("[gt] session-name") when using
+  # replace-query+print-query. Parse that explicitly before treating as new name.
+  if [[ "$query" =~ ^\[([^][]+)\][[:space:]]+(.+)$ ]]; then
+    socket="${BASH_REMATCH[1]}"
+    session="${BASH_REMATCH[2]}"
+    handle_output "$socket" "$session"
+    exit 0
+  fi
+
+  # Query-only accept (new session): create in current socket, else default.
+  socket="${CURRENT_SOCKET:-default}"
+  handle_output "$socket" "$query"
+}
+
+main "$@"
