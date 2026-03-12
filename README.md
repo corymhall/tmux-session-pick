@@ -13,6 +13,7 @@ It started from ideas in `omerxx/tmux-sessionx`, but this version is intentional
 
 - `bin/tmux-session-pick`: executable picker script
 - `AGENTS.md`: repo-specific guidance for AI coding agents
+- `Makefile`: canonical local verification commands
 
 ## Usage
 
@@ -31,8 +32,25 @@ List the current rows without launching `fzf`:
 Example tmux binding:
 
 ```tmux
-bind-key -T prefix u run-shell "$HOME/personal/tmux-session-pick/bin/tmux-session-pick"
+bind-key -T prefix u run-shell "$HOME/path/to/tmux-session-pick/bin/tmux-session-pick"
 ```
+
+## Dependencies
+
+- `tmux`
+- `fzf` or `fzf-tmux` for the interactive picker
+
+The `--list` path does not require `fzf`; it is intended to be the cheapest verification path for development and CI.
+
+## Row Model
+
+`bin/tmux-session-pick --list` emits tab-separated rows in this shape:
+
+```text
+socket<TAB>session<TAB>attached<TAB>display
+```
+
+The first three columns are hidden metadata used for action execution. The final display column is the only column rendered in the picker UI. Keep control flow keyed off the hidden columns instead of re-parsing display text.
 
 ## Configuration
 
@@ -59,8 +77,14 @@ The script reads several tmux options for UI and keybind behavior, including:
 Quick validation:
 
 ```bash
-bash -n ./bin/tmux-session-pick
-./bin/tmux-session-pick --list
+make verify
 ```
 
-Interactive behavior is easiest to verify from inside tmux.
+Useful commands:
+
+```bash
+make list
+make run
+```
+
+Interactive behavior is easiest to verify from inside tmux. For switching or action changes, verify from both inside tmux and outside tmux when practical.

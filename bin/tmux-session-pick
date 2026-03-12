@@ -86,6 +86,10 @@ main() {
   local additional_fzf_options header result fzf_cmd window_height window_width
 
   command -v tmux >/dev/null 2>&1 || { echo "tmux required" >&2; exit 1; }
+  if [[ "${1:-}" == "--list" ]]; then
+    build_input_rows
+    exit 0
+  fi
   if command -v fzf-tmux >/dev/null 2>&1; then
     fzf_cmd="fzf-tmux"
   elif command -v fzf >/dev/null 2>&1; then
@@ -97,11 +101,6 @@ main() {
 
   CURRENT_SOCKET="$(socket_from_tmux_env || true)"
   CURRENT_SESSION="$(tmux display-message -p '#S' 2>/dev/null || true)"
-
-  if [[ "${1:-}" == "--list" ]]; then
-    build_input_rows
-    exit 0
-  fi
 
   input="$(build_input_rows)"
   if [[ -z "${input//[[:space:]]/}" ]]; then
