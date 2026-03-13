@@ -2,7 +2,7 @@
 
 ## Current Status
 
-- Stage: review workers launched, awaiting reports
+- Stage: final verification and ship
 - Branch: `integration/build-gastown-picker-hub`
 - Epic: `pick-28n`
 - Review profiles: `general`
@@ -15,9 +15,9 @@
 - [x] Keep session switching behavior intact for tmux session rows
 - [x] Add rig-targeted prompt-to-sling action
 - [x] Add crew lifecycle actions for restart and stop
-- [ ] Keep crew entries visible by default and polecats hidden by default
-- [ ] Preserve lightweight verification via `make verify`, `make list`, and interactive checks
-- [ ] Update `README.md` and `AGENTS.md` for metadata, keybinds, and semantics changes
+- [x] Keep crew entries visible by default and polecats hidden by default
+- [x] Preserve lightweight verification via `make verify`, `make list`, and interactive checks
+- [x] Update `README.md` and `AGENTS.md` for metadata, keybinds, and semantics changes
 
 ## Proof Model
 
@@ -52,6 +52,13 @@
   - Evidence: docked rig prompt routing is now explicitly guarded and session-kill uses the shared guarded action path instead of a silent no-op
   - Remaining risk: side-effecting happy paths still rely on command-shape verification rather than live execution
   - Next milestone still makes sense: yes
+- Slice 4: non-blocking review-note cleanup
+  - Status: complete
+  - Spec coverage: verification hygiene and action robustness
+  - Proof model: targeted follow-up on review notes
+  - Evidence: checklist state corrected, prompt-bead cleanup added on sling failure, preview default added, and JSON-shape assumptions documented inline
+  - Remaining risk: live side-effect paths still need real interactive validation
+  - Next milestone still makes sense: yes
 
 ## Commands Run + Outcomes
 
@@ -79,6 +86,10 @@
 - `gt sling mol-review-implementation tmux_session_pick --crew reviewclaude ...` -> attached review wisp `pick-wisp-jja2`
 - `gt nudge tmux_session_pick/crew/reviewcodex --mode=queue ...` -> queued explicit review-start reminder
 - `gt nudge tmux_session_pick/crew/reviewclaude ...` -> delivered explicit review-start reminder
+- `make verify` -> passed after review-driven guard fixes
+- `bin/tmux-session-pick --action kill-session rig ...` -> returned cleanly through the explicit unsupported-row guard
+- `bin/tmux-session-pick --list | rg 'sling:blocked'` -> confirmed docked rig rows advertise blocked sling state
+- `bin/tmux-session-pick --preview unknown ...` -> returned default preview fallback text
 
 ## Files Changed
 
@@ -107,3 +118,23 @@
   - Agent: `claude`
   - Wisp: `pick-wisp-jja2`
   - Expected report: `/Users/chall/gt/tmux_session_pick/.runtime/reviews/pick-enhancements/20260313-052259/claude-review.md`
+
+## Review Synthesis
+
+- Review outcome: pass with notes
+- Blocking findings: none
+- Review artifacts:
+  - `/Users/chall/gt/tmux_session_pick/.runtime/reviews/pick-enhancements/20260313-052259/claude-review.md`
+  - `/Users/chall/gt/tmux_session_pick/.runtime/reviews/pick-enhancements/20260313-052259/codex-review.md`
+- Overlap across reviewers:
+  - no blockers after the guard-fix pass
+  - remaining evidence gap is live validation of side-effecting paths
+  - JSON parsing is still shape-coupled, though now documented inline
+- Follow-up taken before finalization:
+  - added explicit docked-rig prompt guards
+  - routed session kill through the shared guarded action path
+  - corrected checklist state in the ledger
+  - added prompt-bead cleanup on sling failure
+  - added a default preview fallback and documented JSON-shape assumptions
+- Remaining non-blocking risk:
+  - prompt-to-sling, crew restart/stop, and interactive session attachment were not exercised live in this session due side effects and environment cost

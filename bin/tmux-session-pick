@@ -74,6 +74,8 @@ build_tmux_rows() {
 
 list_rigs_tsv() {
   command -v gt >/dev/null 2>&1 || return 0
+  # Expect one key per line from `gt rig list --json`; keep this parser small
+  # and dependency-free, but documented so shape changes are easier to spot.
   gt rig list --json 2>/dev/null | awk '
     function flush() {
       if (name != "") {
@@ -117,6 +119,7 @@ list_rigs_tsv() {
 list_crews_tsv() {
   local rig="$1"
   command -v gt >/dev/null 2>&1 || return 0
+  # Expect one key per line from `gt crew list --rig <rig> --json`.
   gt crew list --rig "$rig" --json 2>/dev/null | awk -v rig="$rig" '
     function flush() {
       if (name != "") {
@@ -231,6 +234,9 @@ preview_row() {
         printf 'Crew: %s/%s\nStatus: %s\n' "$rig" "$name" "$status"
       fi
       ;;
+    *)
+      printf 'No preview available for %s\n' "$entry_kind"
+      ;;
   esac
 }
 
@@ -272,6 +278,7 @@ action_sling_prompt() {
   }
 
   gt sling "$bead_id" "$rig" --args "$prompt" --hook-raw-bead >/dev/null 2>&1 || {
+    bd close "$bead_id" >/dev/null 2>&1 || true
     notify_user "Unable to sling prompt to $rig."
     return 1
   }
