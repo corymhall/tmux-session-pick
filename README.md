@@ -68,11 +68,13 @@ Default picker behavior now depends on the selected row kind:
 - `rig` row + typed query + `Enter`: create a prompt bead in that rig and sling it to the selected rig
 
 Rig prompt routing is only actionable on non-docked rigs. Docked rig rows stay visible for context, but the picker now guards that action explicitly instead of failing silently.
+Rig rows now also advertise their current `Enter` behavior directly in the display text, so docked rows show that prompt slinging is blocked and that `alt-u` is the way to undock them.
 
 Additional default keybinds:
 
 - `alt-r`: restart the selected crew row via `gt crew restart`
 - `alt-x`: stop the selected crew row via `gt crew stop`
+- `alt-u`: undock the selected docked rig row via `gt rig undock`
 - `alt-bspace`: kill the selected tmux session row
 
 Unsupported action/row combinations are guarded explicitly with a user-facing message.
@@ -118,6 +120,7 @@ The script reads several tmux options for UI and keybind behavior, including:
 - `@tmux-session-pick-bind-kill-session`
 - `@tmux-session-pick-bind-crew-restart`
 - `@tmux-session-pick-bind-crew-stop`
+- `@tmux-session-pick-bind-rig-undock`
 - `@tmux-session-pick-bind-cycle-mode`
 - `@tmux-session-pick-bind-mode-sessions`
 - `@tmux-session-pick-bind-mode-crews`

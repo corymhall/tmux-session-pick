@@ -214,16 +214,18 @@ list_crews_tsv() {
 
 build_gastown_rows() {
   local mode="$1"
-  local rig status crew_count polecats crew_name branch live git_state sling_state
+  local rig status crew_count polecats crew_name branch live git_state sling_state rig_hint
   while IFS=$'\t' read -r rig status crew_count polecats; do
     [[ -n "$rig" ]] || continue
     sling_state="ready"
+    rig_hint="enter:sling"
     if [[ "$status" == "docked" ]]; then
       sling_state="blocked"
+      rig_hint="enter:blocked alt-u:undock"
     fi
     if [[ "$mode" == "rigs" || "$mode" == "all" ]]; then
-      printf 'rig\t%s\t%s\t%s\t\t\t\t[rig] %-18s status:%-11s sling:%-7s crew:%s polecats:%s\n' \
-        "$rig" "$rig" "$status" "$rig" "$status" "$sling_state" "$crew_count" "$polecats"
+      printf 'rig\t%s\t%s\t%s\t\t\t\t[rig] %-18s status:%-11s %s crew:%s polecats:%s\n' \
+        "$rig" "$rig" "$status" "$rig" "$status" "$rig_hint" "$crew_count" "$polecats"
     fi
 
     if [[ "$mode" == "crews" || "$mode" == "all" ]]; then
@@ -364,6 +366,21 @@ handle_action() {
       fi
       gt crew stop "$name" --rig "$rig" >/dev/null 2>&1 || notify_user "Crew stop failed for $rig/$name."
       ;;
+    rig-undock)
+      if [[ "$entry_kind" != "rig" ]]; then
+        notify_user "Undock is only available on rig rows."
+        return 0
+      fi
+      if [[ "$4" != "docked" ]]; then
+        notify_user "Rig $rig is not docked."
+        return 0
+      fi
+      gt rig undock "$rig" >/dev/null 2>&1 || {
+        notify_user "Rig undock failed for $rig."
+        return 1
+      }
+      notify_user "Rig undocked: $rig"
+      ;;
     kill-session)
       if [[ "$entry_kind" != "session" ]]; then
         notify_user "Session kill is only available on tmux session rows."
@@ -399,7 +416,7 @@ main() {
   local input query selected entry_kind rig name status socket session attached
   local preview_location preview_ratio prompt_icon pointer_icon
   local bind_accept bind_exit bind_delete_char bind_scroll_up bind_scroll_down bind_select_up bind_select_down bind_kill_session
-  local bind_crew_restart bind_crew_stop bind_mode_sessions bind_mode_crews bind_mode_rigs bind_mode_all bind_cycle_mode
+  local bind_crew_restart bind_crew_stop bind_rig_undock bind_mode_sessions bind_mode_crews bind_mode_rigs bind_mode_all bind_cycle_mode
   local additional_fzf_options header result fzf_cmd window_height window_width
   local self_path self_cmd picker_mode
 
@@ -467,13 +484,14 @@ main() {
   bind_kill_session="$(tmux_option_or_fallback '@tmux-session-pick-bind-kill-session' 'alt-bspace')"
   bind_crew_restart="$(tmux_option_or_fallback '@tmux-session-pick-bind-crew-restart' 'alt-r')"
   bind_crew_stop="$(tmux_option_or_fallback '@tmux-session-pick-bind-crew-stop' 'alt-x')"
+  bind_rig_undock="$(tmux_option_or_fallback '@tmux-session-pick-bind-rig-undock' 'alt-u')"
   bind_mode_sessions="$(tmux_option_or_fallback '@tmux-session-pick-bind-mode-sessions' 'alt-1')"
   bind_mode_crews="$(tmux_option_or_fallback '@tmux-session-pick-bind-mode-crews' 'alt-2')"
   bind_mode_rigs="$(tmux_option_or_fallback '@tmux-session-pick-bind-mode-rigs' 'alt-3')"
   bind_mode_all="$(tmux_option_or_fallback '@tmux-session-pick-bind-mode-all' 'alt-4')"
   bind_cycle_mode="$(tmux_option_or_fallback '@tmux-session-pick-bind-cycle-mode' 'alt-t')"
   additional_fzf_options="$(tmux_option_or_fallback '@tmux-session-pick-additional-options' '--color pointer:9,spinner:92,marker:46')"
-  header="$bind_accept=open/sling  $bind_kill_session=kill-session  $bind_crew_restart=restart-crew  $bind_crew_stop=stop-crew  $bind_cycle_mode=cycle-mode  $bind_mode_sessions=sessions  $bind_mode_crews=crews  $bind_mode_rigs=rigs  $bind_mode_all=all  $bind_select_up=up  $bind_select_down=down  $bind_scroll_up=prev-up  $bind_scroll_down=prev-down  ?=toggle-preview"
+  header="$bind_accept=open/sling  $bind_kill_session=kill-session  $bind_crew_restart=restart-crew  $bind_crew_stop=stop-crew  $bind_rig_undock=undock-rig  $bind_cycle_mode=cycle-mode  $bind_mode_sessions=sessions  $bind_mode_crews=crews  $bind_mode_rigs=rigs  $bind_mode_all=all  $bind_select_up=up  $bind_select_down=down  $bind_scroll_up=prev-up  $bind_scroll_down=prev-down  ?=toggle-preview"
 
   if [[ "$fzf_cmd" == "fzf-tmux" ]]; then
     result="$(
@@ -489,6 +507,7 @@ main() {
           --bind "$bind_kill_session:execute-silent($self_cmd --action kill-session {1} {2} {3} {4} {5} {6} {7})+reload($self_cmd --list)" \
           --bind "$bind_crew_restart:execute-silent($self_cmd --action crew-restart {1} {2} {3} {4} {5} {6} {7})+reload($self_cmd --list)" \
           --bind "$bind_crew_stop:execute-silent($self_cmd --action crew-stop {1} {2} {3} {4} {5} {6} {7})+reload($self_cmd --list)" \
+          --bind "$bind_rig_undock:execute-silent($self_cmd --action rig-undock {1} {2} {3} {4} {5} {6} {7})+reload($self_cmd --list)" \
           --bind "$bind_cycle_mode:execute-silent($self_cmd --cycle-mode)+reload($self_cmd --list)" \
           --bind "$bind_mode_sessions:execute-silent($self_cmd --set-mode sessions)+reload($self_cmd --list sessions)" \
           --bind "$bind_mode_crews:execute-silent($self_cmd --set-mode crews)+reload($self_cmd --list crews)" \
@@ -521,6 +540,7 @@ main() {
           --bind "$bind_kill_session:execute-silent($self_cmd --action kill-session {1} {2} {3} {4} {5} {6} {7})+reload($self_cmd --list)" \
           --bind "$bind_crew_restart:execute-silent($self_cmd --action crew-restart {1} {2} {3} {4} {5} {6} {7})+reload($self_cmd --list)" \
           --bind "$bind_crew_stop:execute-silent($self_cmd --action crew-stop {1} {2} {3} {4} {5} {6} {7})+reload($self_cmd --list)" \
+          --bind "$bind_rig_undock:execute-silent($self_cmd --action rig-undock {1} {2} {3} {4} {5} {6} {7})+reload($self_cmd --list)" \
           --bind "$bind_cycle_mode:execute-silent($self_cmd --cycle-mode)+reload($self_cmd --list)" \
           --bind "$bind_mode_sessions:execute-silent($self_cmd --set-mode sessions)+reload($self_cmd --list sessions)" \
           --bind "$bind_mode_crews:execute-silent($self_cmd --set-mode crews)+reload($self_cmd --list crews)" \

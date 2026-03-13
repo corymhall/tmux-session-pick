@@ -34,6 +34,7 @@
 - New session creation must keep working both inside tmux and outside tmux.
 - Prompt routing is rig-targeted only in the first pass. Crew rows are for crew attachment and lifecycle actions.
 - Docked rig rows may remain visible, but prompt routing against them must guard explicitly rather than failing silently.
+- Docked rig rows may offer an explicit undock action, but only on rig rows and only when the rig is actually docked.
 
 ## Editing Guidelines
 
@@ -47,6 +48,7 @@
 - Run `make verify` after script edits.
 - For row-generation changes, inspect `make list` output as well as `make test`.
 - For Gastown-aware changes, confirm `make list` shows sensible `session`, `rig`, and `crew` rows and that crew actions only apply to crew rows.
+- For rig-row changes, confirm the display text makes `Enter` semantics obvious and that docked rows advertise blocked sling/undock behavior clearly.
 - For mode changes, confirm `bin/tmux-session-pick --list sessions|crews|rigs|all` each return the intended row subset.
 - For tmux switching or action changes, verify from both inside tmux and outside tmux when practical.
 
