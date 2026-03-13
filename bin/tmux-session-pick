@@ -17,13 +17,57 @@ trim_whitespace() {
   sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
 }
 
+normalize_picker_mode() {
+  case "${1:-}" in
+    sessions|crews|rigs|all)
+      printf '%s\n' "$1"
+      ;;
+    *)
+      printf 'sessions\n'
+      ;;
+  esac
+}
+
+ensure_tmux_option_server() {
+  tmux start-server >/dev/null 2>&1 || true
+}
+
 tmux_option_or_fallback() {
   local option_value
+  ensure_tmux_option_server
   option_value="$(tmux show-option -gqv "$1" 2>/dev/null || true)"
   if [[ -z "$option_value" ]]; then
     option_value="$2"
   fi
   echo "$option_value"
+}
+
+current_picker_mode() {
+  normalize_picker_mode "$(tmux_option_or_fallback '@tmux-session-pick-mode' 'sessions')"
+}
+
+set_picker_mode() {
+  local mode
+  mode="$(normalize_picker_mode "$1")"
+  ensure_tmux_option_server
+  tmux set-option -gq '@tmux-session-pick-mode' "$mode" 2>/dev/null || true
+}
+
+cycle_picker_mode() {
+  case "$(current_picker_mode)" in
+    sessions)
+      set_picker_mode crews
+      ;;
+    crews)
+      set_picker_mode rigs
+      ;;
+    rigs)
+      set_picker_mode all
+      ;;
+    *)
+      set_picker_mode sessions
+      ;;
+  esac
 }
 
 socket_from_tmux_env() {
@@ -169,6 +213,7 @@ list_crews_tsv() {
 }
 
 build_gastown_rows() {
+  local mode="$1"
   local rig status crew_count polecats crew_name branch live git_state sling_state
   while IFS=$'\t' read -r rig status crew_count polecats; do
     [[ -n "$rig" ]] || continue
@@ -176,20 +221,36 @@ build_gastown_rows() {
     if [[ "$status" == "docked" ]]; then
       sling_state="blocked"
     fi
-    printf 'rig\t%s\t%s\t%s\t\t\t\t[rig] %-18s status:%-11s sling:%-7s crew:%s polecats:%s\n' \
-      "$rig" "$rig" "$status" "$rig" "$status" "$sling_state" "$crew_count" "$polecats"
+    if [[ "$mode" == "rigs" || "$mode" == "all" ]]; then
+      printf 'rig\t%s\t%s\t%s\t\t\t\t[rig] %-18s status:%-11s sling:%-7s crew:%s polecats:%s\n' \
+        "$rig" "$rig" "$status" "$rig" "$status" "$sling_state" "$crew_count" "$polecats"
+    fi
 
-    while IFS=$'\t' read -r _rig crew_name branch live git_state; do
-      [[ -n "$crew_name" ]] || continue
-      printf 'crew\t%s\t%s\t%s/%s\t\t\t\t[crew] %-18s session:%-7s branch:%s git:%s\n' \
-        "$rig" "$crew_name" "$live" "$git_state" "$rig/$crew_name" "$live" "$branch" "$git_state"
-    done < <(list_crews_tsv "$rig")
+    if [[ "$mode" == "crews" || "$mode" == "all" ]]; then
+      while IFS=$'\t' read -r _rig crew_name branch live git_state; do
+        [[ -n "$crew_name" ]] || continue
+        printf 'crew\t%s\t%s\t%s/%s\t\t\t\t[crew] %-18s session:%-7s branch:%s git:%s\n' \
+          "$rig" "$crew_name" "$live" "$git_state" "$rig/$crew_name" "$live" "$branch" "$git_state"
+      done < <(list_crews_tsv "$rig")
+    fi
   done < <(list_rigs_tsv)
 }
 
 build_input_rows() {
-  build_tmux_rows
-  build_gastown_rows
+  local mode
+  mode="$(normalize_picker_mode "${1:-$(current_picker_mode)}")"
+  case "$mode" in
+    sessions)
+      build_tmux_rows
+      ;;
+    crews|rigs)
+      build_gastown_rows "$mode"
+      ;;
+    all)
+      build_tmux_rows
+      build_gastown_rows "$mode"
+      ;;
+  esac
 }
 
 handle_tmux_session_selection() {
@@ -338,13 +399,14 @@ main() {
   local input query selected entry_kind rig name status socket session attached
   local preview_location preview_ratio prompt_icon pointer_icon
   local bind_accept bind_exit bind_delete_char bind_scroll_up bind_scroll_down bind_select_up bind_select_down bind_kill_session
-  local bind_crew_restart bind_crew_stop additional_fzf_options header result fzf_cmd window_height window_width
-  local self_path self_cmd
+  local bind_crew_restart bind_crew_stop bind_mode_sessions bind_mode_crews bind_mode_rigs bind_mode_all bind_cycle_mode
+  local additional_fzf_options header result fzf_cmd window_height window_width
+  local self_path self_cmd picker_mode
 
   command -v tmux >/dev/null 2>&1 || { echo "tmux required" >&2; exit 1; }
   case "${1:-}" in
     --list)
-      build_input_rows
+      build_input_rows "${2:-}"
       exit 0
       ;;
     --preview)
@@ -355,6 +417,14 @@ main() {
     --action)
       shift
       handle_action "$@"
+      exit 0
+      ;;
+    --set-mode)
+      set_picker_mode "${2:-sessions}"
+      exit 0
+      ;;
+    --cycle-mode)
+      cycle_picker_mode
       exit 0
       ;;
   esac
@@ -369,11 +439,12 @@ main() {
 
   self_path="$(cd -- "$(dirname -- "$0")" && pwd)/$(basename -- "$0")"
   self_cmd="$(printf '%q' "$self_path")"
+  picker_mode="$(current_picker_mode)"
 
   CURRENT_SOCKET="$(socket_from_tmux_env || true)"
   CURRENT_SESSION="$(tmux display-message -p '#S' 2>/dev/null || true)"
 
-  input="$(build_input_rows)"
+  input="$(build_input_rows "$picker_mode")"
   if [[ -z "${input//[[:space:]]/}" ]]; then
     echo "No picker entries found." >&2
     exit 1
@@ -395,8 +466,13 @@ main() {
   bind_kill_session="$(tmux_option_or_fallback '@tmux-session-pick-bind-kill-session' 'alt-bspace')"
   bind_crew_restart="$(tmux_option_or_fallback '@tmux-session-pick-bind-crew-restart' 'alt-r')"
   bind_crew_stop="$(tmux_option_or_fallback '@tmux-session-pick-bind-crew-stop' 'alt-x')"
+  bind_mode_sessions="$(tmux_option_or_fallback '@tmux-session-pick-bind-mode-sessions' 'alt-1')"
+  bind_mode_crews="$(tmux_option_or_fallback '@tmux-session-pick-bind-mode-crews' 'alt-2')"
+  bind_mode_rigs="$(tmux_option_or_fallback '@tmux-session-pick-bind-mode-rigs' 'alt-3')"
+  bind_mode_all="$(tmux_option_or_fallback '@tmux-session-pick-bind-mode-all' 'alt-4')"
+  bind_cycle_mode="$(tmux_option_or_fallback '@tmux-session-pick-bind-cycle-mode' 'alt-m')"
   additional_fzf_options="$(tmux_option_or_fallback '@tmux-session-pick-additional-options' '--color pointer:9,spinner:92,marker:46')"
-  header="$bind_accept=open/sling  $bind_kill_session=kill-session  $bind_crew_restart=restart-crew  $bind_crew_stop=stop-crew  $bind_select_up=up  $bind_select_down=down  $bind_scroll_up=prev-up  $bind_scroll_down=prev-down  ?=toggle-preview"
+  header="$bind_accept=open/sling  $bind_kill_session=kill-session  $bind_crew_restart=restart-crew  $bind_crew_stop=stop-crew  $bind_cycle_mode=cycle-mode  $bind_mode_sessions=sessions  $bind_mode_crews=crews  $bind_mode_rigs=rigs  $bind_mode_all=all  $bind_select_up=up  $bind_select_down=down  $bind_scroll_up=prev-up  $bind_scroll_down=prev-down  ?=toggle-preview"
 
   if [[ "$fzf_cmd" == "fzf-tmux" ]]; then
     result="$(
@@ -412,6 +488,11 @@ main() {
           --bind "$bind_kill_session:execute-silent($self_cmd --action kill-session {1} {2} {3} {4} {5} {6} {7})+reload($self_cmd --list)" \
           --bind "$bind_crew_restart:execute-silent($self_cmd --action crew-restart {1} {2} {3} {4} {5} {6} {7})+reload($self_cmd --list)" \
           --bind "$bind_crew_stop:execute-silent($self_cmd --action crew-stop {1} {2} {3} {4} {5} {6} {7})+reload($self_cmd --list)" \
+          --bind "$bind_cycle_mode:execute-silent($self_cmd --cycle-mode)+reload($self_cmd --list)" \
+          --bind "$bind_mode_sessions:execute-silent($self_cmd --set-mode sessions)+reload($self_cmd --list sessions)" \
+          --bind "$bind_mode_crews:execute-silent($self_cmd --set-mode crews)+reload($self_cmd --list crews)" \
+          --bind "$bind_mode_rigs:execute-silent($self_cmd --set-mode rigs)+reload($self_cmd --list rigs)" \
+          --bind "$bind_mode_all:execute-silent($self_cmd --set-mode all)+reload($self_cmd --list all)" \
           --bind '?:toggle-preview' \
           --delimiter $'\t' \
           --with-nth=8 \
@@ -439,6 +520,11 @@ main() {
           --bind "$bind_kill_session:execute-silent($self_cmd --action kill-session {1} {2} {3} {4} {5} {6} {7})+reload($self_cmd --list)" \
           --bind "$bind_crew_restart:execute-silent($self_cmd --action crew-restart {1} {2} {3} {4} {5} {6} {7})+reload($self_cmd --list)" \
           --bind "$bind_crew_stop:execute-silent($self_cmd --action crew-stop {1} {2} {3} {4} {5} {6} {7})+reload($self_cmd --list)" \
+          --bind "$bind_cycle_mode:execute-silent($self_cmd --cycle-mode)+reload($self_cmd --list)" \
+          --bind "$bind_mode_sessions:execute-silent($self_cmd --set-mode sessions)+reload($self_cmd --list sessions)" \
+          --bind "$bind_mode_crews:execute-silent($self_cmd --set-mode crews)+reload($self_cmd --list crews)" \
+          --bind "$bind_mode_rigs:execute-silent($self_cmd --set-mode rigs)+reload($self_cmd --list rigs)" \
+          --bind "$bind_mode_all:execute-silent($self_cmd --set-mode all)+reload($self_cmd --list all)" \
           --bind '?:toggle-preview' \
           --delimiter $'\t' \
           --with-nth=8 \

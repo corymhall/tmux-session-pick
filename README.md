@@ -79,6 +79,25 @@ Unsupported action/row combinations are guarded explicitly with a user-facing me
 
 Crew rows are shown by default. Polecats are not included in the first pass.
 
+## Modes
+
+The picker now supports four row modes:
+
+- `sessions`: tmux session rows only
+- `crews`: Gastown crew rows only
+- `rigs`: Gastown rig rows only
+- `all`: mixed session, rig, and crew rows
+
+The default mode is `sessions`, so the picker opens like the original session switcher unless you explicitly change modes.
+
+Default mode-switch keybinds:
+
+- `alt-m`: cycle `sessions -> crews -> rigs -> all -> sessions`
+- `alt-1`: switch to `sessions`
+- `alt-2`: switch to `crews`
+- `alt-3`: switch to `rigs`
+- `alt-4`: switch to `all`
+
 ## Configuration
 
 The script reads several tmux options for UI and keybind behavior, including:
@@ -99,6 +118,12 @@ The script reads several tmux options for UI and keybind behavior, including:
 - `@tmux-session-pick-bind-kill-session`
 - `@tmux-session-pick-bind-crew-restart`
 - `@tmux-session-pick-bind-crew-stop`
+- `@tmux-session-pick-bind-cycle-mode`
+- `@tmux-session-pick-bind-mode-sessions`
+- `@tmux-session-pick-bind-mode-crews`
+- `@tmux-session-pick-bind-mode-rigs`
+- `@tmux-session-pick-bind-mode-all`
+- `@tmux-session-pick-mode`
 - `@tmux-session-pick-additional-options`
 
 ## Development

@@ -30,6 +30,7 @@
 - Preserve the current cross-socket behavior: switch in-place when staying on the same socket, detach/reattach when crossing sockets.
 - The display column is presentation only. Hidden metadata columns are the contract for actions.
 - Mixed row kinds are now part of the contract: `session`, `rig`, and `crew`.
+- Mode filtering is now part of the UX contract: `sessions`, `crews`, `rigs`, and `all`, with `sessions` as the default.
 - New session creation must keep working both inside tmux and outside tmux.
 - Prompt routing is rig-targeted only in the first pass. Crew rows are for crew attachment and lifecycle actions.
 - Docked rig rows may remain visible, but prompt routing against them must guard explicitly rather than failing silently.
@@ -46,12 +47,14 @@
 - Run `make verify` after script edits.
 - For row-generation changes, inspect `make list` output as well as `make test`.
 - For Gastown-aware changes, confirm `make list` shows sensible `session`, `rig`, and `crew` rows and that crew actions only apply to crew rows.
+- For mode changes, confirm `bin/tmux-session-pick --list sessions|crews|rigs|all` each return the intended row subset.
 - For tmux switching or action changes, verify from both inside tmux and outside tmux when practical.
 
 ## Documentation
 
 - Update `README.md` when adding new keybinds, tmux options, or action semantics.
 - Mention new non-obvious metadata columns, row kinds, or naming assumptions in the README.
+- Keep mode-switch keybinds and default mode documented in the README when they change.
 - Keep command examples aligned with `Makefile` targets.
 
 ## Forbidden Actions
