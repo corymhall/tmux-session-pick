@@ -339,6 +339,7 @@ main() {
   local preview_location preview_ratio prompt_icon pointer_icon
   local bind_accept bind_exit bind_delete_char bind_scroll_up bind_scroll_down bind_select_up bind_select_down bind_kill_session
   local bind_crew_restart bind_crew_stop additional_fzf_options header result fzf_cmd window_height window_width
+  local self_path self_cmd
 
   command -v tmux >/dev/null 2>&1 || { echo "tmux required" >&2; exit 1; }
   case "${1:-}" in
@@ -365,6 +366,9 @@ main() {
     echo "fzf or fzf-tmux required" >&2
     exit 1
   fi
+
+  self_path="$(cd -- "$(dirname -- "$0")" && pwd)/$(basename -- "$0")"
+  self_cmd="$(printf '%q' "$self_path")"
 
   CURRENT_SOCKET="$(socket_from_tmux_env || true)"
   CURRENT_SESSION="$(tmux display-message -p '#S' 2>/dev/null || true)"
@@ -405,9 +409,9 @@ main() {
           --bind "$bind_select_down:down" \
           --bind "$bind_scroll_up:preview-half-page-up" \
           --bind "$bind_scroll_down:preview-half-page-down" \
-          --bind "$bind_kill_session:execute-silent($0 --action kill-session {1} {2} {3} {4} {5} {6} {7})+reload($0 --list)" \
-          --bind "$bind_crew_restart:execute-silent($0 --action crew-restart {1} {2} {3} {4} {5} {6} {7})+reload($0 --list)" \
-          --bind "$bind_crew_stop:execute-silent($0 --action crew-stop {1} {2} {3} {4} {5} {6} {7})+reload($0 --list)" \
+          --bind "$bind_kill_session:execute-silent($self_cmd --action kill-session {1} {2} {3} {4} {5} {6} {7})+reload($self_cmd --list)" \
+          --bind "$bind_crew_restart:execute-silent($self_cmd --action crew-restart {1} {2} {3} {4} {5} {6} {7})+reload($self_cmd --list)" \
+          --bind "$bind_crew_stop:execute-silent($self_cmd --action crew-stop {1} {2} {3} {4} {5} {6} {7})+reload($self_cmd --list)" \
           --bind '?:toggle-preview' \
           --delimiter $'\t' \
           --with-nth=8 \
@@ -415,7 +419,7 @@ main() {
           --prompt "$prompt_icon" \
           --pointer "$pointer_icon" \
           --layout default \
-          --preview '$0 --preview {1} {2} {3} {4} {5} {6} {7}' \
+          --preview "$self_cmd --preview {1} {2} {3} {4} {5} {6} {7}" \
           --preview-window "${preview_location},${preview_ratio},," \
           --print-query \
           --exit-0 \
@@ -432,9 +436,9 @@ main() {
           --bind "$bind_select_down:down" \
           --bind "$bind_scroll_up:preview-half-page-up" \
           --bind "$bind_scroll_down:preview-half-page-down" \
-          --bind "$bind_kill_session:execute-silent($0 --action kill-session {1} {2} {3} {4} {5} {6} {7})+reload($0 --list)" \
-          --bind "$bind_crew_restart:execute-silent($0 --action crew-restart {1} {2} {3} {4} {5} {6} {7})+reload($0 --list)" \
-          --bind "$bind_crew_stop:execute-silent($0 --action crew-stop {1} {2} {3} {4} {5} {6} {7})+reload($0 --list)" \
+          --bind "$bind_kill_session:execute-silent($self_cmd --action kill-session {1} {2} {3} {4} {5} {6} {7})+reload($self_cmd --list)" \
+          --bind "$bind_crew_restart:execute-silent($self_cmd --action crew-restart {1} {2} {3} {4} {5} {6} {7})+reload($self_cmd --list)" \
+          --bind "$bind_crew_stop:execute-silent($self_cmd --action crew-stop {1} {2} {3} {4} {5} {6} {7})+reload($self_cmd --list)" \
           --bind '?:toggle-preview' \
           --delimiter $'\t' \
           --with-nth=8 \
@@ -442,7 +446,7 @@ main() {
           --prompt "$prompt_icon" \
           --pointer "$pointer_icon" \
           --layout default \
-          --preview '$0 --preview {1} {2} {3} {4} {5} {6} {7}' \
+          --preview "$self_cmd --preview {1} {2} {3} {4} {5} {6} {7}" \
           --preview-window "${preview_location},${preview_ratio},," \
           --print-query \
           --exit-0 \
