@@ -39,18 +39,41 @@ bind-key -T prefix u run-shell "$HOME/path/to/tmux-session-pick/bin/tmux-session
 
 - `tmux`
 - `fzf` or `fzf-tmux` for the interactive picker
+- `gt` for Gastown-aware rig and crew rows plus crew/prompt actions
 
-The `--list` path does not require `fzf`; it is intended to be the cheapest verification path for development and CI.
+The `--list` path does not require `fzf`; it is intended to be the cheapest verification path for development and CI. If `gt` is unavailable, the picker falls back to tmux session rows only.
 
 ## Row Model
 
 `bin/tmux-session-pick --list` emits tab-separated rows in this shape:
 
 ```text
-socket<TAB>session<TAB>attached<TAB>display
+entry_kind<TAB>rig<TAB>name<TAB>status<TAB>socket<TAB>session<TAB>attached<TAB>display
 ```
 
-The first three columns are hidden metadata used for action execution. The final display column is the only column rendered in the picker UI. Keep control flow keyed off the hidden columns instead of re-parsing display text.
+Current entry kinds:
+
+- `session`: tmux session rows
+- `rig`: Gastown rig rows
+- `crew`: Gastown crew rows
+
+The hidden columns are the action contract. The final display column is the only column rendered in the picker UI. Keep control flow keyed off the hidden columns instead of re-parsing display text.
+
+## Actions
+
+Default picker behavior now depends on the selected row kind:
+
+- `session` row + `Enter`: switch or attach to the tmux session
+- `crew` row + `Enter`: attach to that crew workspace via `gt crew at`
+- `rig` row + typed query + `Enter`: create a prompt bead in that rig and sling it to the selected rig
+
+Additional default keybinds:
+
+- `alt-r`: restart the selected crew row via `gt crew restart`
+- `alt-x`: stop the selected crew row via `gt crew stop`
+- `alt-bspace`: kill the selected tmux session row
+
+Crew rows are shown by default. Polecats are not included in the first pass.
 
 ## Configuration
 
@@ -70,6 +93,8 @@ The script reads several tmux options for UI and keybind behavior, including:
 - `@tmux-session-pick-bind-select-up`
 - `@tmux-session-pick-bind-select-down`
 - `@tmux-session-pick-bind-kill-session`
+- `@tmux-session-pick-bind-crew-restart`
+- `@tmux-session-pick-bind-crew-stop`
 - `@tmux-session-pick-additional-options`
 
 ## Development

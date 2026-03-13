@@ -29,7 +29,9 @@
 - Use only `@tmux-session-pick-*` tmux options for repo-owned configuration.
 - Preserve the current cross-socket behavior: switch in-place when staying on the same socket, detach/reattach when crossing sockets.
 - The display column is presentation only. Hidden metadata columns are the contract for actions.
+- Mixed row kinds are now part of the contract: `session`, `rig`, and `crew`.
 - New session creation must keep working both inside tmux and outside tmux.
+- Prompt routing is rig-targeted only in the first pass. Crew rows are for crew attachment and lifecycle actions.
 
 ## Editing Guidelines
 
@@ -42,12 +44,13 @@
 
 - Run `make verify` after script edits.
 - For row-generation changes, inspect `make list` output as well as `make test`.
+- For Gastown-aware changes, confirm `make list` shows sensible `session`, `rig`, and `crew` rows and that crew actions only apply to crew rows.
 - For tmux switching or action changes, verify from both inside tmux and outside tmux when practical.
 
 ## Documentation
 
 - Update `README.md` when adding new keybinds, tmux options, or action semantics.
-- Mention new non-obvious metadata columns or naming assumptions in the README.
+- Mention new non-obvious metadata columns, row kinds, or naming assumptions in the README.
 - Keep command examples aligned with `Makefile` targets.
 
 ## Forbidden Actions
@@ -55,6 +58,7 @@
 - Do not add a new runtime dependency or rewrite this into another language without discussion.
 - Do not parse the display string for control flow when hidden metadata columns can carry the data directly.
 - Do not rename or silently repurpose an existing `@tmux-session-pick-*` tmux option.
+- Do not silently widen prompt routing from rig rows to crew rows without updating the spec and docs.
 - Do not claim interactive tmux behavior was verified unless you actually tested it.
 - Do not use destructive git commands such as `git reset --hard` or `git checkout --` without explicit approval.
 
@@ -70,4 +74,5 @@
 - `bin/tmux-session-pick` logic: run `make verify`
 - Row layout or hidden metadata columns: run `make list` and update `README.md`
 - Keybinds, tmux options, or action semantics: update `README.md`
+- Rig and crew actions: verify guards for unsupported row kinds stay explicit
 - Cross-socket switching or session creation behavior: verify inside tmux and outside tmux when practical
