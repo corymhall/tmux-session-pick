@@ -92,7 +92,7 @@ The default mode is `sessions`, so the picker opens like the original session sw
 
 Default mode-switch keybinds:
 
-- `alt-m`: cycle `sessions -> crews -> rigs -> all -> sessions`
+- `alt-s`: cycle `sessions -> crews -> rigs -> all -> sessions`
 - `alt-1`: switch to `sessions`
 - `alt-2`: switch to `crews`
 - `alt-3`: switch to `rigs`
