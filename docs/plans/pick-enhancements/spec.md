@@ -65,17 +65,29 @@ The query box serves two purposes:
 - prompt capture for the prompt-to-sling action
 
 Prompt routing should work by taking the current query text plus the selected row metadata and dispatching through one action function that runs the appropriate `gt` command for the selected target. The UI should not need separate prompt forms in the first pass.
+For the first pass, prompt-to-sling should be rig-targeted only. Crew rows remain visible and actionable for crew lifecycle commands, but prompt submission should only be enabled on rows that carry a rig-capable sling target.
 
 ### Actions
 
 The first pass must preserve existing session switching behavior and add at least these Gastown-aware actions:
-- prompt-to-sling on the selected target
+- prompt-to-sling on the selected rig target
 - `gt crew restart`
 - `gt crew stop`
 
 Each action should be implemented as a metadata-driven dispatch path, not as custom parsing of display text. After side-effecting actions like restart or stop, the picker should reload so the list reflects the latest state.
 
 The current session-kill action pattern in `fzf` is a good model for this reload behavior and should be generalized carefully rather than replaced.
+
+### Implementation Components
+
+The first-pass implementation should stay explicit about responsibilities inside `bin/tmux-session-pick`:
+- tmux session collection for existing socket and session rows
+- Gastown row collection for rig and crew-derived entries
+- one merged row builder that emits the full hidden-metadata contract
+- a display formatter that keeps rendered labels separate from action data
+- an action dispatch layer that maps `entry_kind` plus the selected hidden metadata to the appropriate command path
+
+Unsupported actions for a given `entry_kind` must be guarded explicitly. The first pass should no-op with a clear user-facing message, or otherwise refuse safely, instead of trying to execute a mismatched command against the wrong row type.
 
 ### Integration with Existing Scripts
 
@@ -145,6 +157,7 @@ Every material trade-off from the session is serialized here.
 | D-3 | `gt-crew-pick` integration level | Selection patterns only | Most behaviors in first pass; keep fully separate | Reusing rig/crew discovery and picker patterns is high value without absorbing heavier flows too early. | Resolved |
 | D-4 | Interaction shape | Single enhanced picker | Mode-based picker; two-step action then target flow | This is the closest fit to the existing tool and minimizes new state and documentation overhead. | Resolved |
 | D-5 | Runtime stack | Stay with Bash + `fzf` | Rewrite to a heavier TUI stack | The repo is intentionally script-first and the current design can still absorb the first-pass feature set. | Resolved |
+| D-6 | Prompt routing target model | Rig rows only | Rig and crew rows; crew rows only | This matches the original rig-targeted sling goal and keeps first-pass dispatch semantics narrower and clearer. | Resolved |
 
 ## Traceability
 
@@ -156,6 +169,7 @@ Every material trade-off from the session is serialized here.
 | `gt-crew-pick` reuse boundary | user answer on integration level + local script review | Limits the first pass to selection and metadata reuse rather than full workflow absorption. |
 | Single enhanced picker interaction | user architecture choice + prior recommendation | Records why this feature stays close to the current tool instead of branching into modes or a separate action chooser. |
 | Action list for prompt-to-sling, restart, and stop | original feature brief + user scope choice | Converts the starting conversation into concrete, first-pass implementation targets. |
+| Rig-targeted prompt routing | enrichment decision D-6 | Narrows prompt submission to rig-capable rows while keeping crew rows focused on lifecycle actions. |
 
 ## Risks
 
@@ -172,4 +186,3 @@ Every material trade-off from the session is serialized here.
 - Use `make list` to inspect the expanded row model and confirm metadata ordering.
 - Use `make run` for interactive checks from tmux when verifying keybind behavior.
 - For lifecycle or action changes, verify list reload behavior after side-effecting commands where practical.
-
