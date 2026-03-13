@@ -32,6 +32,7 @@
 - Mixed row kinds are now part of the contract: `session`, `rig`, and `crew`.
 - New session creation must keep working both inside tmux and outside tmux.
 - Prompt routing is rig-targeted only in the first pass. Crew rows are for crew attachment and lifecycle actions.
+- Docked rig rows may remain visible, but prompt routing against them must guard explicitly rather than failing silently.
 
 ## Editing Guidelines
 

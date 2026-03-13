@@ -166,11 +166,15 @@ list_crews_tsv() {
 }
 
 build_gastown_rows() {
-  local rig status crew_count polecats crew_name branch live git_state
+  local rig status crew_count polecats crew_name branch live git_state sling_state
   while IFS=$'\t' read -r rig status crew_count polecats; do
     [[ -n "$rig" ]] || continue
-    printf 'rig\t%s\t%s\t%s\t\t\t\t[rig] %-18s status:%-11s crew:%s polecats:%s\n' \
-      "$rig" "$rig" "$status" "$rig" "$status" "$crew_count" "$polecats"
+    sling_state="ready"
+    if [[ "$status" == "docked" ]]; then
+      sling_state="blocked"
+    fi
+    printf 'rig\t%s\t%s\t%s\t\t\t\t[rig] %-18s status:%-11s sling:%-7s crew:%s polecats:%s\n' \
+      "$rig" "$rig" "$status" "$rig" "$status" "$sling_state" "$crew_count" "$polecats"
 
     while IFS=$'\t' read -r _rig crew_name branch live git_state; do
       [[ -n "$crew_name" ]] || continue
@@ -251,9 +255,14 @@ EOF
 }
 
 action_sling_prompt() {
-  local rig="$1" prompt="$2" bead_id
+  local rig="$1" rig_status="$2" prompt="$3" bead_id
   if [[ -z "$prompt" ]]; then
     notify_user "Type a prompt, then press Enter on a rig row."
+    return 0
+  fi
+
+  if [[ "$rig_status" == "docked" ]]; then
+    notify_user "Cannot sling to docked rig $rig."
     return 0
   fi
 
@@ -287,6 +296,13 @@ handle_action() {
       fi
       gt crew stop "$name" --rig "$rig" >/dev/null 2>&1 || notify_user "Crew stop failed for $rig/$name."
       ;;
+    kill-session)
+      if [[ "$entry_kind" != "session" ]]; then
+        notify_user "Session kill is only available on tmux session rows."
+        return 0
+      fi
+      tmux -L "$5" kill-session -t "$6" >/dev/null 2>&1 || notify_user "Session kill failed for $6."
+      ;;
     *)
       notify_user "Unknown action: $action"
       ;;
@@ -303,7 +319,7 @@ handle_selection() {
       gt crew at "$name" --rig "$rig"
       ;;
     rig)
-      action_sling_prompt "$rig" "$query"
+      action_sling_prompt "$rig" "$status" "$query"
       ;;
     *)
       notify_user "Unsupported entry kind: $entry_kind"
@@ -382,7 +398,7 @@ main() {
           --bind "$bind_select_down:down" \
           --bind "$bind_scroll_up:preview-half-page-up" \
           --bind "$bind_scroll_down:preview-half-page-down" \
-          --bind "$bind_kill_session:execute-silent(test {1} = session && tmux -L {5} kill-session -t {6})+reload($0 --list)" \
+          --bind "$bind_kill_session:execute-silent($0 --action kill-session {1} {2} {3} {4} {5} {6} {7})+reload($0 --list)" \
           --bind "$bind_crew_restart:execute-silent($0 --action crew-restart {1} {2} {3} {4} {5} {6} {7})+reload($0 --list)" \
           --bind "$bind_crew_stop:execute-silent($0 --action crew-stop {1} {2} {3} {4} {5} {6} {7})+reload($0 --list)" \
           --bind '?:toggle-preview' \
@@ -409,7 +425,7 @@ main() {
           --bind "$bind_select_down:down" \
           --bind "$bind_scroll_up:preview-half-page-up" \
           --bind "$bind_scroll_down:preview-half-page-down" \
-          --bind "$bind_kill_session:execute-silent(test {1} = session && tmux -L {5} kill-session -t {6})+reload($0 --list)" \
+          --bind "$bind_kill_session:execute-silent($0 --action kill-session {1} {2} {3} {4} {5} {6} {7})+reload($0 --list)" \
           --bind "$bind_crew_restart:execute-silent($0 --action crew-restart {1} {2} {3} {4} {5} {6} {7})+reload($0 --list)" \
           --bind "$bind_crew_stop:execute-silent($0 --action crew-stop {1} {2} {3} {4} {5} {6} {7})+reload($0 --list)" \
           --bind '?:toggle-preview' \

@@ -67,11 +67,15 @@ Default picker behavior now depends on the selected row kind:
 - `crew` row + `Enter`: attach to that crew workspace via `gt crew at`
 - `rig` row + typed query + `Enter`: create a prompt bead in that rig and sling it to the selected rig
 
+Rig prompt routing is only actionable on non-docked rigs. Docked rig rows stay visible for context, but the picker now guards that action explicitly instead of failing silently.
+
 Additional default keybinds:
 
 - `alt-r`: restart the selected crew row via `gt crew restart`
 - `alt-x`: stop the selected crew row via `gt crew stop`
 - `alt-bspace`: kill the selected tmux session row
+
+Unsupported action/row combinations are guarded explicitly with a user-facing message.
 
 Crew rows are shown by default. Polecats are not included in the first pass.
 

@@ -2,7 +2,7 @@
 
 ## Current Status
 
-- Stage: implementation in progress
+- Stage: review workers launched, awaiting reports
 - Branch: `integration/build-gastown-picker-hub`
 - Epic: `pick-28n`
 - Review profiles: `general`
@@ -45,6 +45,13 @@
   - Evidence: `make verify` passed; rig and crew previews returned expected data; row-kind guard for crew actions returned cleanly on a non-crew row
   - Remaining risk: prompt-to-sling and actual crew restart/stop have not been exercised live in this session to avoid unnecessary side effects
   - Next milestone still makes sense: yes
+- Slice 3: review-driven guard fixes
+  - Status: complete
+  - Spec coverage: Implementation Components and action-guard requirements from the enriched spec
+  - Proof model: red-green against review findings
+  - Evidence: docked rig prompt routing is now explicitly guarded and session-kill uses the shared guarded action path instead of a silent no-op
+  - Remaining risk: side-effecting happy paths still rely on command-shape verification rather than live execution
+  - Next milestone still makes sense: yes
 
 ## Commands Run + Outcomes
 
@@ -63,6 +70,15 @@
 - `bin/tmux-session-pick --preview rig gastown ...` -> showed rig preview data
 - `bin/tmux-session-pick --preview crew gastown quick ...` -> showed crew preview data
 - `bin/tmux-session-pick --action crew-restart rig ...` -> returned via unsupported-row guard without side effects
+- reviewer fallback report -> identified missing docked-rig guard and silent session-kill behavior
+- `git commit --allow-empty -m "checkpoint: prepare pick-enhancements for external review"` -> created review checkpoint `ba14bdd`
+- `git push` -> pushed checkpoint commit to `origin/integration/build-gastown-picker-hub`
+- `gt crew start tmux_session_pick reviewcodex --agent codex` -> created local codex review sidecar workspace/session
+- `gt crew start tmux_session_pick reviewclaude --agent claude` -> created local claude review sidecar workspace/session
+- `gt sling mol-review-implementation tmux_session_pick --crew reviewcodex ...` -> attached review wisp `pick-wisp-6pon`
+- `gt sling mol-review-implementation tmux_session_pick --crew reviewclaude ...` -> attached review wisp `pick-wisp-jja2`
+- `gt nudge tmux_session_pick/crew/reviewcodex --mode=queue ...` -> queued explicit review-start reminder
+- `gt nudge tmux_session_pick/crew/reviewclaude ...` -> delivered explicit review-start reminder
 
 ## Files Changed
 
@@ -76,3 +92,18 @@
 - Need to keep the hidden metadata contract understandable as row kinds expand
 - Interactive behavior inside tmux still needs end-to-end manual validation after docs are updated
 - Prompt-to-sling and real crew lifecycle commands are implemented but only guard-level checked in this session
+- The rig is docked, so review workers had to run as same-rig crew sidecars rather than polecats
+
+## Review Runs
+
+- Review directory: `/Users/chall/gt/tmux_session_pick/.runtime/reviews/pick-enhancements/20260313-052259`
+- Review checkpoint: `ba14bdd`
+- Implementation scope: `origin/integration/build-gastown-picker-hub`
+- Worker: `tmux_session_pick/crew/reviewcodex`
+  - Agent: `codex`
+  - Wisp: `pick-wisp-6pon`
+  - Expected report: `/Users/chall/gt/tmux_session_pick/.runtime/reviews/pick-enhancements/20260313-052259/codex-review.md`
+- Worker: `tmux_session_pick/crew/reviewclaude`
+  - Agent: `claude`
+  - Wisp: `pick-wisp-jja2`
+  - Expected report: `/Users/chall/gt/tmux_session_pick/.runtime/reviews/pick-enhancements/20260313-052259/claude-review.md`
