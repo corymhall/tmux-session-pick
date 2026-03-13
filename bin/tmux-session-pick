@@ -443,6 +443,7 @@ main() {
 
   CURRENT_SOCKET="$(socket_from_tmux_env || true)"
   CURRENT_SESSION="$(tmux display-message -p '#S' 2>/dev/null || true)"
+  trap 'set_picker_mode sessions' EXIT
 
   input="$(build_input_rows "$picker_mode")"
   if [[ -z "${input//[[:space:]]/}" ]]; then
@@ -451,7 +452,7 @@ main() {
   fi
 
   preview_location="$(tmux_option_or_fallback '@tmux-session-pick-preview-location' 'right')"
-  preview_ratio="$(tmux_option_or_fallback '@tmux-session-pick-preview-ratio' '75%')"
+  preview_ratio="$(tmux_option_or_fallback '@tmux-session-pick-preview-ratio' '45%')"
   window_height="$(tmux_option_or_fallback '@tmux-session-pick-window-height' '75%')"
   window_width="$(tmux_option_or_fallback '@tmux-session-pick-window-width' '75%')"
   prompt_icon="$(tmux_option_or_fallback '@tmux-session-pick-prompt' ' ')"
@@ -470,7 +471,7 @@ main() {
   bind_mode_crews="$(tmux_option_or_fallback '@tmux-session-pick-bind-mode-crews' 'alt-2')"
   bind_mode_rigs="$(tmux_option_or_fallback '@tmux-session-pick-bind-mode-rigs' 'alt-3')"
   bind_mode_all="$(tmux_option_or_fallback '@tmux-session-pick-bind-mode-all' 'alt-4')"
-  bind_cycle_mode="$(tmux_option_or_fallback '@tmux-session-pick-bind-cycle-mode' 'alt-s')"
+  bind_cycle_mode="$(tmux_option_or_fallback '@tmux-session-pick-bind-cycle-mode' 'alt-t')"
   additional_fzf_options="$(tmux_option_or_fallback '@tmux-session-pick-additional-options' '--color pointer:9,spinner:92,marker:46')"
   header="$bind_accept=open/sling  $bind_kill_session=kill-session  $bind_crew_restart=restart-crew  $bind_crew_stop=stop-crew  $bind_cycle_mode=cycle-mode  $bind_mode_sessions=sessions  $bind_mode_crews=crews  $bind_mode_rigs=rigs  $bind_mode_all=all  $bind_select_up=up  $bind_select_down=down  $bind_scroll_up=prev-up  $bind_scroll_down=prev-down  ?=toggle-preview"
 

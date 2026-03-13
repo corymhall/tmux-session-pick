@@ -88,11 +88,11 @@ The picker now supports four row modes:
 - `rigs`: Gastown rig rows only
 - `all`: mixed session, rig, and crew rows
 
-The default mode is `sessions`, so the picker opens like the original session switcher unless you explicitly change modes.
+The default mode is `sessions`, so the picker opens like the original session switcher. Mode switches are for the current picker run; the next open returns to `sessions`.
 
 Default mode-switch keybinds:
 
-- `alt-s`: cycle `sessions -> crews -> rigs -> all -> sessions`
+- `alt-t`: cycle `sessions -> crews -> rigs -> all -> sessions`
 - `alt-1`: switch to `sessions`
 - `alt-2`: switch to `crews`
 - `alt-3`: switch to `rigs`
